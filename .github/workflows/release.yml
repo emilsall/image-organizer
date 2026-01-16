@@ -6,6 +6,9 @@ on:
       - 'v*'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     strategy:
@@ -68,6 +71,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
+          name: Release ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
           files: |
             dist/*
         env:
