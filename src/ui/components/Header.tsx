@@ -2,7 +2,14 @@ import React from 'react';
 import { Box, Text, Newline } from 'ink';
 import Spinner from 'ink-spinner';
 
-export default function Header({ dryRun, targetPath, status, complete }) {
+interface Props {
+  dryRun: boolean;
+  targetPath: string;
+  status: string;
+  complete: boolean;
+}
+
+export default function Header({ dryRun, targetPath, status, complete }: Props) {
   return (
     <Box flexDirection="column">
       <Box>

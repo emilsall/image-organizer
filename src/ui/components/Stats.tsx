@@ -1,7 +1,13 @@
 import React from 'react';
 import { Box, Text, Newline } from 'ink';
 
-export default function Stats({ filesFound, filesProcessed, duplicatesFound }) {
+interface Props {
+  filesFound: number;
+  filesProcessed: number;
+  duplicatesFound: number;
+}
+
+export default function Stats({ filesFound, filesProcessed, duplicatesFound }: Props) {
   return (
     <Box flexDirection="column">
       <Text>Files found: {filesFound}</Text>

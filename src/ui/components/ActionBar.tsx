@@ -2,7 +2,14 @@ import React from 'react';
 import { Box, Text, Newline } from 'ink';
 import TextInput from 'ink-text-input';
 
-export default function ActionBar({ awaitingConfirm, renameMode, renameInput, setRenameInput }) {
+interface Props {
+  awaitingConfirm: boolean;
+  renameMode: boolean;
+  renameInput: string;
+  setRenameInput: (value: string) => void;
+}
+
+export default function ActionBar({ awaitingConfirm, renameMode, renameInput, setRenameInput }: Props) {
   if (!awaitingConfirm) return null;
   return (
     <>

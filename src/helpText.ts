@@ -1,9 +1,9 @@
-export function printHelp() {
+export function printHelp(): void {
   console.log(`
 Media File Organizer (Bun Edition)
 
 Usage:
-  bun run media-organizer.js [path] [options]
+  bun run media-organizer.ts [path] [options]
 
 Arguments:
   path         Path to scan (default: current directory)
@@ -23,8 +23,8 @@ Description:
   Organizes files into /YEAR/YYYY-MM-DD/ based on EXIF or file dates.
 
 Examples:
-  bun run media-organizer.js                        # Dry run in current directory
-  bun run media-organizer.js /path/to/photos        # Dry run in specified path
-  bun run media-organizer.js ~/Pictures --execute   # Organize files in ~/Pictures
+  bun run media-organizer.ts                        # Dry run in current directory
+  bun run media-organizer.ts /path/to/photos        # Dry run in specified path
+  bun run media-organizer.ts ~/Pictures --execute   # Organize files in ~/Pictures
   `);
 }

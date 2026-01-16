@@ -1,10 +1,10 @@
 import { render } from 'ink';
 import { stat } from 'fs/promises';
 import { resolve } from 'path';
-import MediaOrganizer from './ui/MediaOrganizer.js';
-import { printHelp } from './helpText.js';
+import MediaOrganizer from './ui/MediaOrganizer';
+import { printHelp } from './helpText';
 
-export async function run() {
+export async function run(): Promise<void> {
   const args = process.argv.slice(2);
   const dryRun = !args.includes('--execute');
   const pathArgs = args.filter(arg => !arg.startsWith('--'));

@@ -37,20 +37,20 @@ bun install
 Run a dry run (recommended):
 
 ```bash
-bun run media-organizer.js /path/to/media
+bun run media-organizer.ts /path/to/media
 ```
 
 Execute immediately (skips the prompt):
 
 ```bash
-bun run media-organizer.js /path/to/media --execute
+bun run media-organizer.ts /path/to/media --execute
 ```
 
 Build a standalone binary:
 
 ```bash
 bun run build
-# Produces ./media-organizer
+# Produces ./dist/media-organizer-<platform>-<arch>
 ```
 
 ## Interactive Review & Actions
@@ -83,19 +83,19 @@ The list annotates your choices:
 Dry run on current directory:
 
 ```bash
-bun run media-organizer.js
+bun run media-organizer.ts
 ```
 
 Dry run on `~/Pictures`:
 
 ```bash
-bun run media-organizer.js ~/Pictures
+bun run media-organizer.ts ~/Pictures
 ```
 
 Execute on `~/Pictures`:
 
 ```bash
-bun run media-organizer.js ~/Pictures --execute
+bun run media-organizer.ts ~/Pictures --execute
 ```
 
 ## Tech Stack

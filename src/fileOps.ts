@@ -1,15 +1,15 @@
 import { readFile, readdir, stat, rm } from 'fs/promises';
 import { join, extname, basename, dirname, relative } from 'path';
 import { createHash } from 'crypto';
-import { IMAGE_EXTENSIONS, RAW_EXTENSIONS, VIDEO_EXTENSIONS, isIgnorableFile } from './constants.js';
+import { IMAGE_EXTENSIONS, RAW_EXTENSIONS, VIDEO_EXTENSIONS, isIgnorableFile } from './constants';
 
-export async function getFileHash(filePath, size) {
+export async function getFileHash(filePath: string, size: number): Promise<string> {
   const buffer = await readFile(filePath);
   const hash = createHash('md5').update(buffer).digest('hex');
   return `${size}-${hash}`;
 }
 
-export async function extractExifDate(buffer) {
+export async function extractExifDate(buffer: Buffer): Promise<Date | null> {
   try {
     const dataView = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
 
@@ -65,7 +65,7 @@ export async function extractExifDate(buffer) {
           const match = dateStr.match(/^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})$/);
           if (match) {
             const [, year, month, day, hour, minute, second] = match;
-            return new Date(year, month - 1, day, hour, minute, second);
+            return new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second));
           }
         }
       }
@@ -98,7 +98,7 @@ export async function extractExifDate(buffer) {
               const match = dateStr.match(/^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})$/);
               if (match) {
                 const [, year, month, day, hour, minute, second] = match;
-                return new Date(year, month - 1, day, hour, minute, second);
+                return new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second));
               }
             }
           }
@@ -109,7 +109,7 @@ export async function extractExifDate(buffer) {
   return null;
 }
 
-export async function getExifDate(filePath) {
+export async function getExifDate(filePath: string): Promise<Date | null> {
   try {
     const buffer = await readFile(filePath);
     return await extractExifDate(Buffer.from(buffer));
@@ -118,20 +118,20 @@ export async function getExifDate(filePath) {
   }
 }
 
-export async function getFileDate(filePath) {
+export async function getFileDate(filePath: string): Promise<Date> {
   const exifDate = await getExifDate(filePath);
   if (exifDate) return exifDate;
   const stats = await stat(filePath);
-  return stats.birthtime || stats.mtime;
+  return (stats as any).birthtime || stats.mtime;
 }
 
-export function splitNameAndExt(filename) {
+export function splitNameAndExt(filename: string): { base: string; ext: string } {
   const ext = extname(filename);
   const base = ext ? filename.slice(0, -ext.length) : filename;
   return { base, ext };
 }
 
-export async function pathExists(p) {
+export async function pathExists(p: string): Promise<boolean> {
   try {
     await stat(p);
     return true;
@@ -140,7 +140,18 @@ export async function pathExists(p) {
   }
 }
 
-export async function resolveDestinationOperation(info, targetDir) {
+export type DestinationResolution =
+  | { kind: 'move'; target: string; targetDir: string }
+  | { kind: 'delete'; duplicateOf: string };
+
+export interface FileInfoSummary {
+  path: string;
+  size: number;
+  date: Date;
+  hash: string;
+}
+
+export async function resolveDestinationOperation(info: FileInfoSummary, targetDir: string): Promise<DestinationResolution> {
   const originalName = basename(info.path);
   const { base, ext } = splitNameAndExt(originalName);
   let i = 0;
@@ -152,7 +163,7 @@ export async function resolveDestinationOperation(info, targetDir) {
       return { kind: 'move', target: candidatePath, targetDir };
     }
     const candStats = await stat(candidatePath);
-    const candHash = await getFileHash(candidatePath, candStats.size);
+    const candHash = await getFileHash(candidatePath, (candStats as any).size ?? candStats.size);
     if (candHash === info.hash) {
       return { kind: 'delete', duplicateOf: candidatePath };
     }
@@ -160,7 +171,7 @@ export async function resolveDestinationOperation(info, targetDir) {
   }
 }
 
-export function isInOrganizedPath(root, fullPath) {
+export function isInOrganizedPath(root: string, fullPath: string): boolean {
   const rel = relative(root, fullPath);
   if (!rel || rel.startsWith('..')) return false;
   const parts = rel.split(/[\\\/]/).filter(Boolean);
@@ -169,7 +180,7 @@ export function isInOrganizedPath(root, fullPath) {
   return /^\d{4}$/.test(yearPart) && /^\d{4}-\d{2}-\d{2}$/.test(dayPart);
 }
 
-export async function findMediaFiles(dir, files = [], root = dir, dirSet) {
+export async function findMediaFiles(dir: string, files: string[] = [], root: string = dir, dirSet?: Set<string>): Promise<string[]> {
   if (dirSet) dirSet.add(dir);
   const entries = await readdir(dir, { withFileTypes: true });
   for (const entry of entries) {
@@ -188,7 +199,7 @@ export async function findMediaFiles(dir, files = [], root = dir, dirSet) {
   return files;
 }
 
-export async function tryRemoveIfEffectivelyEmpty(dir) {
+export async function tryRemoveIfEffectivelyEmpty(dir: string): Promise<boolean> {
   try {
     let entries = await readdir(dir, { withFileTypes: true });
     for (const entry of entries) {
@@ -211,8 +222,8 @@ export async function tryRemoveIfEffectivelyEmpty(dir) {
   return false;
 }
 
-export async function removeEmptyUpwards(startDir, stopAt) {
-  let current = startDir;
+export async function removeEmptyUpwards(startDir: string, stopAt: string): Promise<void> {
+  let current: string = startDir;
   while (true) {
     if (current === stopAt) break;
     const relToStop = relative(stopAt, current);
@@ -226,18 +237,18 @@ export async function removeEmptyUpwards(startDir, stopAt) {
   }
 }
 
-export async function cleanupEmptyDirectories(dirs, stopAt) {
+export async function cleanupEmptyDirectories(dirs: string[], stopAt: string): Promise<void> {
   const unique = Array.from(new Set(dirs)).sort((a, b) => b.length - a.length);
   for (const dir of unique) {
     await removeEmptyUpwards(dir, stopAt);
   }
 }
 
-export async function pruneAllEmptyDirs(root) {
-  const stack = [root];
-  const visited = new Set();
+export async function pruneAllEmptyDirs(root: string): Promise<void> {
+  const stack: string[] = [root];
+  const visited = new Set<string>();
   while (stack.length) {
-    const dir = stack.pop();
+    const dir = stack.pop()!;
     if (visited.has(dir)) continue;
     visited.add(dir);
     try {

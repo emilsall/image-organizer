@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text, Newline, useInput } from 'ink';
-import { unlink, mkdir, rename, stat, readdir } from 'fs/promises';
+import { unlink, mkdir, rename, stat } from 'fs/promises';
 import { join, basename, dirname } from 'path';
 import {
   findMediaFiles,
@@ -8,53 +8,68 @@ import {
   getFileHash,
   resolveDestinationOperation,
   cleanupEmptyDirectories,
-  pruneAllEmptyDirs
-} from '../fileOps.js';
+  pruneAllEmptyDirs,
+  type FileInfoSummary
+} from '../fileOps';
 
-import Header from './components/Header.js';
-import Stats from './components/Stats.js';
-import OperationsList from './components/OperationsList.js';
-import ActionBar from './components/ActionBar.js';
-import Footer from './components/Footer.js';
+import Header from './components/Header';
+import Stats from './components/Stats';
+import OperationsList from './components/OperationsList';
+import ActionBar from './components/ActionBar';
+import Footer from './components/Footer';
 
-export default function MediaOrganizer({ dryRun = true, targetPath }) {
-  const [status, setStatus] = useState('Scanning for media files...');
-  const [filesFound, setFilesFound] = useState(0);
-  const [duplicatesFound, setDuplicatesFound] = useState(0);
-  const [filesProcessed, setFilesProcessed] = useState(0);
-  const [operations, setOperations] = useState([]);
-  const [complete, setComplete] = useState(false);
-  const [error, setError] = useState(null);
-  const [awaitingConfirm, setAwaitingConfirm] = useState(false);
-  const [executing, setExecuting] = useState(false);
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const [overrides, setOverrides] = useState({});
-  const [renameMode, setRenameMode] = useState(false);
-  const [renameInput, setRenameInput] = useState('');
+export type DeleteOp = { type: 'delete'; source: string; reason?: string };
+export type MoveOp = { type: 'move'; source: string; target: string; targetDir: string };
+export type Operation = DeleteOp | MoveOp;
+
+export type Override =
+  | { type: 'ignore' }
+  | { type: 'delete' }
+  | { type: 'rename'; newPath: string };
+
+interface Props {
+  dryRun?: boolean;
+  targetPath: string;
+}
+
+export default function MediaOrganizer({ dryRun = true, targetPath }: Props) {
+  const [status, setStatus] = useState<string>('Scanning for media files...');
+  const [filesFound, setFilesFound] = useState<number>(0);
+  const [duplicatesFound, setDuplicatesFound] = useState<number>(0);
+  const [filesProcessed, setFilesProcessed] = useState<number>(0);
+  const [operations, setOperations] = useState<Operation[]>([]);
+  const [complete, setComplete] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [awaitingConfirm, setAwaitingConfirm] = useState<boolean>(false);
+  const [executing, setExecuting] = useState<boolean>(false);
+  const [selectedIndex, setSelectedIndex] = useState<number>(0);
+  const [overrides, setOverrides] = useState<Record<number, Override>>({});
+  const [renameMode, setRenameMode] = useState<boolean>(false);
+  const [renameInput, setRenameInput] = useState<string>('');
 
   useEffect(() => {
     async function organize() {
       try {
         setStatus(`Scanning directories in ${targetPath}...`);
-        const visitedDirs = new Set();
+        const visitedDirs = new Set<string>();
         const files = await findMediaFiles(targetPath, [], targetPath, visitedDirs);
         setFilesFound(files.length);
 
         setStatus('Reading file metadata...');
-        const fileInfos = [];
-        const seenHashes = new Map();
-        const duplicates = [];
+        const fileInfos: (FileInfoSummary & { isDuplicate: boolean; originalPath?: string })[] = [];
+        const seenHashes = new Map<string, string>();
+        const duplicates: typeof fileInfos = [] as any;
 
         for (let i = 0; i < files.length; i++) {
           const filePath = files[i];
           const stats = await stat(filePath);
           const date = await getFileDate(filePath);
-          const hash = await getFileHash(filePath, stats.size);
+          const hash = await getFileHash(filePath, (stats as any).size ?? (stats as any).size);
 
-          const info = { path: filePath, size: stats.size, date, hash, isDuplicate: false };
+          const info: FileInfoSummary & { isDuplicate: boolean; originalPath?: string } = { path: filePath, size: (stats as any).size, date, hash, isDuplicate: false };
           if (seenHashes.has(hash)) {
             info.isDuplicate = true;
-            info.originalPath = seenHashes.get(hash);
+            info.originalPath = seenHashes.get(hash)!;
             duplicates.push(info);
           } else {
             seenHashes.set(hash, filePath);
@@ -67,7 +82,7 @@ export default function MediaOrganizer({ dryRun = true, targetPath }) {
         setDuplicatesFound(duplicates.length);
 
         setStatus('Planning operations...');
-        const ops = [];
+        const ops: Operation[] = [];
         for (const info of fileInfos) {
           if (info.isDuplicate) {
             ops.push({ type: 'delete', source: info.path, reason: `Duplicate of ${info.originalPath}` });
@@ -92,7 +107,7 @@ export default function MediaOrganizer({ dryRun = true, targetPath }) {
         if (!dryRun) {
           setStatus('Executing operations...');
           setExecuting(true);
-          const sourceDirs = new Set();
+          const sourceDirs = new Set<string>();
           for (let i = 0; i < ops.length; i++) {
             const op = ops[i];
             sourceDirs.add(dirname(op.source));
@@ -103,20 +118,20 @@ export default function MediaOrganizer({ dryRun = true, targetPath }) {
               await rename(op.source, op.target);
             }
           }
-          const cleanupCandidates = new Set([...sourceDirs, ...visitedDirs]);
+          const cleanupCandidates = new Set<string>([...sourceDirs, ...visitedDirs]);
           await cleanupEmptyDirectories(Array.from(cleanupCandidates), targetPath);
           await pruneAllEmptyDirs(targetPath);
           setExecuting(false);
           setStatus('Organization complete!');
           setComplete(true);
-          setTimeout(() => process.exit(0), 200);
+          setTimeout(() => { process.stdout.write('\n'); process.exit(0); }, 200);
         } else {
           setStatus('Dry run complete! Use arrows to select; I=Ignore, D=Delete, R=Rename. Press Y/Enter to execute, N to cancel.');
           setComplete(true);
           setAwaitingConfirm(true);
         }
-      } catch (err) {
-        setError(err.message);
+      } catch (err: any) {
+        setError(err?.message ?? String(err));
       }
     }
     organize();
@@ -141,8 +156,8 @@ export default function MediaOrganizer({ dryRun = true, targetPath }) {
       if (input && input.toLowerCase() === 'i') {
         setOverrides((prev) => {
           const current = prev[selectedIndex];
-          const next = { ...prev };
-          if (current?.type === 'ignore') delete next[selectedIndex]; else next[selectedIndex] = { type: 'ignore' };
+          const next = { ...prev } as Record<number, Override>;
+          if (current && current.type === 'ignore') delete next[selectedIndex]; else next[selectedIndex] = { type: 'ignore' };
           return next;
         });
         return;
@@ -150,16 +165,16 @@ export default function MediaOrganizer({ dryRun = true, targetPath }) {
       if (input && input.toLowerCase() === 'd') {
         setOverrides((prev) => {
           const current = prev[selectedIndex];
-          const next = { ...prev };
-          if (current?.type === 'delete') delete next[selectedIndex]; else next[selectedIndex] = { type: 'delete' };
+          const next = { ...prev } as Record<number, Override>;
+          if (current && current.type === 'delete') delete next[selectedIndex]; else next[selectedIndex] = { type: 'delete' };
           return next;
         });
         return;
       }
       if (input && input.toLowerCase() === 'r') {
         const current = overrides[selectedIndex];
-        if (current?.type === 'rename') {
-          setOverrides((prev) => { const next = { ...prev }; delete next[selectedIndex]; return next; });
+        if (current && current.type === 'rename') {
+          setOverrides((prev) => { const next = { ...prev } as Record<number, Override>; delete next[selectedIndex]; return next; });
         } else {
           const op = operations[selectedIndex];
           const initialName = op.type === 'move' ? basename(op.target) : basename(op.source);
@@ -176,7 +191,7 @@ export default function MediaOrganizer({ dryRun = true, targetPath }) {
         setStatus('Executing operations...');
         setExecuting(true);
         try {
-          const sourceDirs = new Set();
+          const sourceDirs = new Set<string>();
           for (let i = 0; i < operations.length; i++) {
             const op = operations[i];
             const override = overrides[i];
@@ -195,23 +210,23 @@ export default function MediaOrganizer({ dryRun = true, targetPath }) {
               await rename(op.source, op.target);
             }
           }
-          const visitedDirs = new Set();
+          const visitedDirs = new Set<string>();
           await findMediaFiles(targetPath, [], targetPath, visitedDirs);
-          const cleanupCandidates = new Set([...sourceDirs, ...visitedDirs]);
+          const cleanupCandidates = new Set<string>([...sourceDirs, ...visitedDirs]);
           await cleanupEmptyDirectories(Array.from(cleanupCandidates), targetPath);
           await pruneAllEmptyDirs(targetPath);
           setStatus('Organization complete!');
-        } catch (e) {
-          setError(e.message);
+        } catch (e: any) {
+          setError(e?.message ?? String(e));
         } finally {
           setExecuting(false);
-          setTimeout(() => process.exit(0), 200);
+          setTimeout(() => { process.stdout.write('\n'); process.exit(0); }, 200);
         }
       })();
     } else if (input.toLowerCase() === 'n' || key.escape || input.toLowerCase() === 'q') {
       setAwaitingConfirm(false);
       setStatus('Canceled. No changes made.');
-      setTimeout(() => process.exit(0), 150);
+      setTimeout(() => { process.stdout.write('\n'); process.exit(0); }, 150);
     }
   });
 

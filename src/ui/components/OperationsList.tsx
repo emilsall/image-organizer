@@ -2,8 +2,15 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { ScrollList } from 'ink-scroll-list';
 import { basename } from 'path';
+import type { Operation, Override } from '../MediaOrganizer';
 
-export default function OperationsList({ operations, overrides, selectedIndex }) {
+interface Props {
+  operations: Operation[];
+  overrides: Record<number, Override>;
+  selectedIndex: number;
+}
+
+export default function OperationsList({ operations, overrides, selectedIndex }: Props) {
   return (
     <Box borderStyle="round" height={12}>
       <ScrollList selectedIndex={selectedIndex} scrollAlignment="auto">
@@ -16,7 +23,7 @@ export default function OperationsList({ operations, overrides, selectedIndex })
           const isSelected = i === selectedIndex;
           const color = ovr?.type === 'ignore' ? 'gray' : (op.type === 'delete' ? 'red' : 'green');
           const line = op.type === 'delete'
-            ? `DELETE: ${op.source} ${op.reason ? 'Reason: ' + op.reason : ''}`
+            ? `DELETE: ${op.source} ${'reason' in op && op.reason ? 'Reason: ' + op.reason : ''}`
             : `MOVE: ${op.source} -> ${op.target}`;
           const itemKey = `${op.type}:${op.source}:${op.type === 'move' ? op.target : ''}`;
           return (

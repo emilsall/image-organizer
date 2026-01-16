@@ -4,9 +4,9 @@ import { spawn } from 'child_process';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
 
-const platformMap = { darwin: 'macos', linux: 'linux', win32: 'windows' };
+const platformMap: Record<string, string> = { darwin: 'macos', linux: 'linux', win32: 'windows' };
 const platform = platformMap[process.platform] || process.platform;
-const arch = process.arch; // 'arm64' | 'x64' | others
+const arch = process.arch;
 const isWindows = platform === 'windows';
 
 const outfile = join('dist', `media-organizer-${platform}-${arch}${isWindows ? '.exe' : ''}`);
@@ -15,7 +15,7 @@ mkdirSync('dist', { recursive: true });
 
 console.log(`Building for platform=${platform} arch=${arch} -> ${outfile}`);
 
-const args = ['build', './media-organizer.js', '--compile', '--outfile', outfile];
+const args = ['build', './media-organizer.ts', '--compile', '--outfile', outfile];
 const child = spawn('bun', args, { stdio: 'inherit' });
 
 child.on('exit', (code) => {
@@ -24,5 +24,5 @@ child.on('exit', (code) => {
   } else {
     console.error(`Build failed with code ${code}`);
   }
-  process.exit(code);
+  process.exit(code === null ? 1 : code);
 });
